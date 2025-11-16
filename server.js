@@ -11,29 +11,34 @@ app.use(express.json());
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 1️⃣ Allow only CSS/JS/images freely
+// 1️⃣ ALWAYS allow static files (CSS, JS, images, fonts, icons)
 app.use((req, res, next) => {
   if (
     req.path.startsWith("/css") ||
     req.path.startsWith("/js") ||
     req.path.startsWith("/images") ||
-    req.path.includes(".") // fonts, icons, png, svg etc.
+    req.path.startsWith("/assets") ||
+    req.path.includes(".") // *.css *.js *.png *.jpg *.ttf *.woff *.svg etc.
   ) {
     return next();
   }
   next();
 });
 
-// 2️⃣ Protection middleware — applied BEFORE serving index.html
+// 2️⃣ Protection ONLY for HTML pages (index.html)
 app.use((req, res, next) => {
+
   // Allow loader API
   if (req.path.startsWith("/frontend-loader")) return next();
 
-  // Check loader headers
+  // Allow static files — already handled above
+  if (req.path.includes(".")) return next();
+
+  // Loader checks
   const fromLoader = req.headers["x-from-loader"] === "true";
   const viaParam = req.query.loader === "true";
 
-  // Block direct access
+  // Block direct visitors
   if (!fromLoader && !viaParam) {
     return res.status(403).send(`
       <h2>Access Restricted</h2>
@@ -44,7 +49,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// 3️⃣ Now serve static files (safe)
+// 3️⃣ Serve static files
 app.use(express.static(path.join(__dirname, "public")));
 
 // 4️⃣ Loader API
@@ -57,15 +62,15 @@ app.get("/frontend-loader", (req, res) => {
 
   res.json({
     allowed: true,
-    code: `console.log("Site loaded via loader script");`,
+    code: `console.log("Loaded via external loader script");`,
   });
 });
 
-// 5️⃣ Fallback → serves index.html only when allowed
+// 5️⃣ Fallback for frontend routes
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// 6️⃣ Start server
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Server running on port " + PORT));
