@@ -11,38 +11,37 @@ app.use(express.json());
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 1️⃣ ALWAYS allow static files (CSS, JS, images, fonts, icons)
+// 1️⃣ ALWAYS allow static assets (css, js, images, fonts)
 app.use((req, res, next) => {
   if (
+    req.path.includes(".") ||               // *.css, *.js, *.png, *.jpg, *.ttf etc.
     req.path.startsWith("/css") ||
     req.path.startsWith("/js") ||
     req.path.startsWith("/images") ||
-    req.path.startsWith("/assets") ||
-    req.path.includes(".") // *.css *.js *.png *.jpg *.ttf *.woff *.svg etc.
+    req.path.startsWith("/assets")
   ) {
     return next();
   }
   next();
 });
 
-// 2️⃣ Protection ONLY for HTML pages (index.html)
+// 2️⃣ PROTECT only HTML pages (not assets)
 app.use((req, res, next) => {
 
   // Allow loader API
   if (req.path.startsWith("/frontend-loader")) return next();
 
-  // Allow static files — already handled above
+  // Allow static files (handled above)
   if (req.path.includes(".")) return next();
 
-  // Loader checks
+  // Check loader auth
   const fromLoader = req.headers["x-from-loader"] === "true";
-  const viaParam = req.query.loader === "true";
+  const viaQuery = req.query.loader === "true";
 
-  // Block direct visitors
-  if (!fromLoader && !viaParam) {
+  if (!fromLoader && !viaQuery) {
     return res.status(403).send(`
       <h2>Access Restricted</h2>
-      <p>This website can only be viewed from the authorized loader script.</p>
+      <p>You cannot open this website directly.</p>
     `);
   }
 
@@ -54,23 +53,23 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // 4️⃣ Loader API
 app.get("/frontend-loader", (req, res) => {
-  const tz = req.headers["x-client-timezone"] || "";
+  const timezone = req.headers["x-client-timezone"] || "";
 
-  if (tz !== "Asia/Calcutta") {
+  if (timezone !== "Asia/Calcutta") {
     return res.json({ allowed: false, code: null });
   }
 
   res.json({
     allowed: true,
-    code: `console.log("Loaded via external loader script");`,
+    code: `console.log("Loaded through authorized loader");`
   });
 });
 
-// 5️⃣ Fallback for frontend routes
+// 5️⃣ Fallback (index.html)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Start server
+// 6️⃣ Start
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on port " + PORT));
+app.listen(PORT, () => console.log("SERVER RUNNING on " + PORT));
